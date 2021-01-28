@@ -7,18 +7,20 @@ import com.test.flickerbroswer.FlickerApplication
 import java.util.concurrent.atomic.AtomicBoolean
 
 sealed class PhotosState {
-    class LoadingUrls : PhotosState()
+    object LoadingUrls : PhotosState()
     class Photos(val urls: List<String>): PhotosState()
+    object Error : PhotosState()
 }
 
 class MainViewModel : ViewModel() {
 
+    private val localLoaded = AtomicBoolean(false)
     private val remoteLoaded = AtomicBoolean(false)
 
     val photos = MutableLiveData<PhotosState>()
 
     init {
-        photos.postValue(PhotosState.LoadingUrls())
+        photos.postValue(PhotosState.LoadingUrls)
     }
 
     fun loadPhotos() {
@@ -26,6 +28,7 @@ class MainViewModel : ViewModel() {
         //transfer local photos into local Cache subject
         FlickerApplication.cache.loadPhotos().subscribe {
             if (!remoteLoaded.get()) {
+                localLoaded.set(true)
                 photos.postValue(PhotosState.Photos(it.photo.map { it.toUrl() }))
             }
         }
@@ -34,6 +37,10 @@ class MainViewModel : ViewModel() {
     }
 
     fun reloadPhotos() {
+        if (!localLoaded.get()) {
+            photos.postValue(PhotosState.LoadingUrls)
+        }
+
         FlickerApplication.source
             .loadPhotos()
             .doOnSuccess {
@@ -42,7 +49,14 @@ class MainViewModel : ViewModel() {
                 photos.postValue(PhotosState.Photos(it.photo.map { it.toUrl() }))
             }
             .flatMapCompletable { FlickerApplication.cache.savePhotos(it) }
-            .subscribe({}, { Log.e(TAG, "Failed to reload photos") })
+            .subscribe({}, {
+                Log.e(TAG, "Failed to reload photos")
+                if (!localLoaded.get()) {
+                    photos.postValue(PhotosState.Error)
+                } else {
+                    photos.value?.let { photos.postValue(it) }
+                }
+            })
     }
 
     companion object {

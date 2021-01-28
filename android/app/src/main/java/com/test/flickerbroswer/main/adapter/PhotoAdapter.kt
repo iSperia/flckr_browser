@@ -8,17 +8,21 @@ import android.widget.ImageView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
-import com.bumptech.glide.request.RequestOptions
 import com.test.flickerbroswer.R
 
 interface PaddingCalculator {
     fun applyPaddings(view: View, position: Int)
 }
 
+interface ClickCallback {
+    fun processClick(url: String)
+}
+
 class PhotoAdapter(
     val context: Context,
     val imageSize: Int,
-    val paddingCalculator: PaddingCalculator
+    val paddingCalculator: PaddingCalculator,
+    val clickCallback: ClickCallback
 ) : RecyclerView.Adapter<PhotoAdapter.ViewHolder>() {
 
     var data: List<String> = emptyList()
@@ -43,6 +47,10 @@ class PhotoAdapter(
         val photo = data[position]
 
         paddingCalculator.applyPaddings(holder.image, position)
+
+        holder.itemView.setOnClickListener {
+            clickCallback.processClick(data[position])
+        }
 
         Glide.with(context)
             .load(photo)
